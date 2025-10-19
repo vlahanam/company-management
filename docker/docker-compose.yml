@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # MySQL Database for Development
+  mysql:
+    image: mysql:8.0
+    container_name: company-management-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: company_db
+      MYSQL_USER: dev_user
+      MYSQL_PASSWORD: dev_password
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - company-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Golang Server for Development (with hot-reload)
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      target: development
+      args:
+        GO_VERSION: 1.21
+        BUILD_ENV: development
+        AIR_VERSION: latest
+    container_name: company-management-server-dev
+    restart: unless-stopped
+    environment:
+      - GO_ENV=development
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=dev_user
+      - DB_PASSWORD=dev_password
+      - DB_NAME=company_db
+      - SERVER_PORT=8080
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../server:/app
+      - /app/tmp
+    networks:
+      - company-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: air -c .air.toml
+
+  # Nginx Reverse Proxy for Development
+  nginx:
+    image: nginx:alpine
+    container_name: company-management-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_logs_dev:/var/log/nginx
+    networks:
+      - company-network
+    depends_on:
+      - server
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  company-network:
+    driver: bridge
+
+volumes:
+  mysql_data_dev:
+    driver: local
+  nginx_logs_dev:
+    driver: local
+

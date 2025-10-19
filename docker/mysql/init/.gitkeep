@@ -1,0 +1,4 @@
+# This file ensures the init directory is tracked by git
+# Add your MySQL initialization scripts here (*.sql or *.sh files)
+# These scripts will be executed when the MySQL container starts for the first time
+

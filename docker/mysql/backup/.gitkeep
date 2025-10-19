@@ -1,0 +1,3 @@
+# This file ensures the backup directory is tracked by git
+# MySQL backups will be stored here
+

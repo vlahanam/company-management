@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # MySQL Database for Production
+  mysql:
+    image: mysql:8.0
+    container_name: company-management-mysql-prod
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-company_db}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - ./mysql/backup:/backup
+    networks:
+      - company-network
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_connections=1000
+      - --innodb_buffer_pool_size=1G
+      - --innodb_log_file_size=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Golang Server for Production
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      target: production
+      args:
+        GO_VERSION: 1.21
+        BUILD_ENV: production
+    container_name: company-management-server-prod
+    restart: always
+    environment:
+      - GO_ENV=production
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE:-company_db}
+      - SERVER_PORT=8080
+      - TZ=Asia/Ho_Chi_Minh
+      - JWT_SECRET=${JWT_SECRET}
+      - API_KEY=${API_KEY}
+    ports:
+      - "8080:8080"
+    networks:
+      - company-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/server", "--health-check"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Nginx Reverse Proxy for Production
+  nginx:
+    image: nginx:alpine
+    container_name: company-management-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs_prod:/var/log/nginx
+      - nginx_cache_prod:/var/cache/nginx
+    networks:
+      - company-network
+    depends_on:
+      - server
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+networks:
+  company-network:
+    driver: bridge
+
+volumes:
+  mysql_data_prod:
+    driver: local
+  nginx_logs_prod:
+    driver: local
+  nginx_cache_prod:
+    driver: local
+
