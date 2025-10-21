@@ -1,4 +1,4 @@
-.PHONY: help dev prod build-dev build-prod up-dev up-prod down-dev down-prod logs-dev logs-prod clean restart-dev restart-prod db-dev db-prod
+.PHONY: help dev prod build-dev build-prod up-dev up-prod down-dev down-prod logs-dev logs-prod clean restart-dev restart-prod db-dev db-prod migrate-create migrate-up migrate-down migrate-force migrate-version migrate-drop seed seed-local
 
 # Default target
 .DEFAULT_GOAL := help
@@ -13,6 +13,16 @@ NC := \033[0m # No Color
 # Docker compose files
 COMPOSE_DEV := docker/docker-compose.yml
 COMPOSE_PROD := docker/docker-compose.prod.yml
+
+# Migration settings
+MIGRATION_DIR := server/database/migration
+SEED_DIR := server/database/seed
+DB_USER ?= dev_user
+DB_PASSWORD ?= dev_password
+DB_NAME ?= company_db
+DB_HOST ?= localhost
+DB_PORT ?= 33066
+DB_URL := "mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DB_HOST):$(DB_PORT))/$(DB_NAME)?multiStatements=true"
 
 ## help: Display this help message
 help:
@@ -37,6 +47,18 @@ help:
 	@echo "  $(GREEN)make restart-prod$(NC) - Restart production containers"
 	@echo "  $(GREEN)make logs-prod$(NC)    - Show production logs"
 	@echo "  $(GREEN)make db-prod$(NC)      - Connect to production MySQL"
+	@echo ""
+	@echo "$(BLUE)Database Migration:$(NC)"
+	@echo "  $(GREEN)make migrate-create$(NC)              - Create new migration file"
+	@echo "  $(GREEN)make migrate-up$(NC)                  - Apply all migrations"
+	@echo "  $(GREEN)make migrate-down$(NC)                - Rollback last migration"
+	@echo "  $(GREEN)make migrate-force$(NC)               - Force set migration version"
+	@echo "  $(GREEN)make migrate-version$(NC)             - Show current migration version"
+	@echo "  $(GREEN)make migrate-drop$(NC)                - Drop all tables (dangerous!)"
+	@echo ""
+	@echo "$(BLUE)Database Seeding:$(NC)"
+	@echo "  $(GREEN)make seed$(NC)                        - Run database seeder in Docker container"
+	@echo "  $(GREEN)make seed-local$(NC)                  - Run database seeder from local machine"
 	@echo ""
 	@echo "$(BLUE)Utility Commands:$(NC)"
 	@echo "  $(GREEN)make clean$(NC)        - Remove all containers, volumes, and images"
@@ -179,4 +201,78 @@ restore-db:
 	@read -p "Enter backup filename: " backup; \
 	docker exec -i company-management-mysql-prod mysql -u$$MYSQL_USER -p$$MYSQL_PASSWORD company_db < ./docker/mysql/backup/$$backup
 	@echo "$(GREEN)✓ Restore completed$(NC)"
+
+## migrate-create: Create a new migration file
+migrate-create:
+	@read -p "Enter migration name (e.g., create_users_table): " migration_name; \
+	if [ -z "$$migration_name" ]; then \
+		echo "$(RED)Error: Migration name cannot be empty$(NC)"; \
+		exit 1; \
+	fi; \
+	if echo "$$migration_name" | LC_ALL=C grep -q '[^a-zA-Z0-9_]'; then \
+		echo "$(RED)Error: Migration name must contain only letters, numbers, and underscores$(NC)"; \
+		echo "$(YELLOW)Invalid characters detected. Please use only: a-z, A-Z, 0-9, _$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(BLUE)Creating migration: $$migration_name$(NC)"; \
+	migrate create -ext sql -dir $(MIGRATION_DIR) -seq $$migration_name; \
+	echo "$(GREEN)✓ Migration files created in $(MIGRATION_DIR)$(NC)"
+
+## migrate-up: Apply all pending migrations
+migrate-up:
+	@echo "$(BLUE)Applying migrations...$(NC)"
+	@migrate -path $(MIGRATION_DIR) -database $(DB_URL) -verbose up
+	@echo "$(GREEN)✓ Migrations applied$(NC)"
+
+## migrate-down: Rollback the last migration
+migrate-down:
+	@echo "$(YELLOW)⚠ Rolling back last migration...$(NC)"
+	@migrate -path $(MIGRATION_DIR) -database $(DB_URL) -verbose down 1
+	@echo "$(GREEN)✓ Migration rolled back$(NC)"
+
+## migrate-force: Force set migration version
+migrate-force:
+	@read -p "Enter version number to force: " version; \
+	if [ -z "$$version" ]; then \
+		echo "$(RED)Error: Version number cannot be empty$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(YELLOW)⚠ Force setting migration version to $$version$(NC)"; \
+	migrate -path $(MIGRATION_DIR) -database $(DB_URL) force $$version; \
+	echo "$(GREEN)✓ Migration version set to $$version$(NC)"
+
+## migrate-version: Show current migration version
+migrate-version:
+	@echo "$(BLUE)Current migration version:$(NC)"
+	@migrate -path $(MIGRATION_DIR) -database $(DB_URL) version
+
+## migrate-drop: Drop all tables (DANGEROUS!)
+migrate-drop:
+	@echo "$(RED)⚠⚠⚠ WARNING: This will drop all tables! ⚠⚠⚠$(NC)"
+	@read -p "Are you ABSOLUTELY sure? Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+		echo "$(BLUE)Dropping all tables...$(NC)"; \
+		migrate -path $(MIGRATION_DIR) -database $(DB_URL) drop -f; \
+		echo "$(GREEN)✓ All tables dropped$(NC)"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+## seed: Run database seeder (inside Docker container)
+seed:
+	@echo "$(BLUE)Running database seeder...$(NC)"
+	@docker exec company-management-server-dev sh -c "cd /app && go run cmd/seed/main.go"
+	@echo "$(GREEN)✓ Database seeding completed$(NC)"
+
+## seed-local: Run database seeder from local machine
+seed-local:
+	@echo "$(BLUE)Running database seeder locally...$(NC)"
+	@cd server && \
+		DB_HOST=localhost \
+		DB_PORT=33066 \
+		DB_USER=$(DB_USER) \
+		DB_PASSWORD=$(DB_PASSWORD) \
+		DB_NAME=$(DB_NAME) \
+		go run cmd/seed/main.go
+	@echo "$(GREEN)✓ Database seeding completed$(NC)"
 

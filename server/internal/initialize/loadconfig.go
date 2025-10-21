@@ -7,6 +7,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type Config struct {
+	DB    DB
+	Fiber Fiber
+	Auth  Auth
+}
+
 type DB struct {
 	DBPort     string
 	DBHost     string
@@ -19,9 +25,9 @@ type Fiber struct {
 	Port string
 }
 
-type Config struct {
-	DB    DB
-	Fiber Fiber
+type Auth struct {
+	AccessSecret  string
+	RefreshSecret string
 }
 
 func LoadConfig() *Config {
@@ -41,6 +47,10 @@ func LoadConfig() *Config {
 		},
 		Fiber: Fiber{
 			Port: os.Getenv("PORT"),
+		},
+		Auth: Auth{
+			AccessSecret:  os.Getenv("ACCESS_SECRET_KEY"),
+			RefreshSecret: os.Getenv("REFRESH_SECRET_KEY"),
 		},
 	}
 
