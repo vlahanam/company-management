@@ -2,6 +2,7 @@ package initialize
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/vlahanam/company-management/internal/routers"
 )
 
 func InitRoute(cfg *Config) {
@@ -13,6 +14,14 @@ func InitRoute(cfg *Config) {
 			"message": "Check health successfuly",
 		})
 	})
+
+	v1 := app.Group("api/v1")
+
+	routers.AuthRoute(v1)
+	routers.CompanyRoute(v1)
+	routers.ContractRoute(v1)
+	routers.EmployeeRoute(v1)
+	routers.PositionRoute(v1)
 
 	port := ":" + cfg.Fiber.Port
 	app.Listen(port)
