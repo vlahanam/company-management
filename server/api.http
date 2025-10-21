@@ -4,5 +4,26 @@
 ### Health Check (via Nginx HTTP)
 GET {{host_http}}/health
 
+---------------------------------------
+
 ### Health Check (Direct to Server - Docker)
 GET {{host_docker}}/health
+
+### Login
+POST {{host_docker}}/api/v1/login
+Content-Type: application/json
+
+{
+  "email": "admin@gmail.com",
+  "password": "123"
+}
+
+### Register
+POST {{host_docker}}/api/v1/register
+Content-Type: application/json
+
+{
+  "full_name": "asdasdasdasd",
+  "email": "admin12212@gmail.com",
+  "password": "123"
+}

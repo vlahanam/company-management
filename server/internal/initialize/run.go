@@ -2,6 +2,6 @@ package initialize
 
 func Run() {
 	cfg := LoadConfig()
-	InitMysql(cfg)
-	InitRoute(cfg)
+	db := InitMysql(cfg)
+	InitRoute(cfg, db)
 }
