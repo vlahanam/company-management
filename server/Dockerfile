@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build arguments
-ARG GO_VERSION=1.21
+ARG GO_VERSION=1.25.3
 ARG BUILD_ENV=production
 
 # Base stage - common for all environments
@@ -38,9 +38,6 @@ COPY . .
 
 # Expose port
 EXPOSE 8080
-
-# Use Air for hot-reload in development
-CMD ["air", "-c", ".air.toml"]
 
 # Builder stage for production
 FROM base AS builder

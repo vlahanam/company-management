@@ -1,0 +1,8 @@
+@host_http = http://localhost:880
+@host_docker = http://localhost:8808
+
+### Health Check (via Nginx HTTP)
+GET {{host_http}}/health
+
+### Health Check (Direct to Server - Docker)
+GET {{host_docker}}/health
