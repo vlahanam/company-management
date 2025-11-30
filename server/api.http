@@ -14,8 +14,8 @@ POST {{host_docker}}/api/v1/login
 Content-Type: application/json
 
 {
-  "email": "admin@gmail.com",
-  "password": "123"
+  "email": "super-admin@gmail.com",
+  "password": "password123"
 }
 
 ### Register
@@ -23,7 +23,7 @@ POST {{host_docker}}/api/v1/register
 Content-Type: application/json
 
 {
-  "full_name": "asdasdasdasd",
+  "full_name": "admin",
   "email": "admin@gmail.com",
-  "password": "123"
+  "password": "password123"
 }

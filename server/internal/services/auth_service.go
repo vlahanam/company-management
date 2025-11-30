@@ -40,7 +40,7 @@ func (as *authService) Login(ctx context.Context, data *requests.LoginRequest) (
 		return nil, common.ErrorValidation.Clone().SetDetail("password", models.ErrInvalidPassword.Error())
 	}
 
-	auth, err := as.GenerateTokens(e.Email)
+	auth, err := as.GenerateTokens(e.ID)
 	if err != nil {
 		return nil, common.ErrorCreateFailed.Clone().WrapError(err)
 	}
@@ -48,10 +48,10 @@ func (as *authService) Login(ctx context.Context, data *requests.LoginRequest) (
 	return auth, nil
 }
 
-func (as *authService) GenerateTokens(email string) (*models.Auth, error) {
+func (as *authService) GenerateTokens(id int64) (*models.Auth, error) {
 	// Access Token (15 minutes)
 	accessClaims := jwt.MapClaims{
-		"email": email,
+		"user_id": id,
 		"exp":   time.Now().Add(expAssetToken).Unix(),
 	}
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
@@ -62,7 +62,7 @@ func (as *authService) GenerateTokens(email string) (*models.Auth, error) {
 
 	// Refresh Token (7 days)
 	refreshClaims := jwt.MapClaims{
-		"email": email,
+		"user_id": id,
 		"exp":   time.Now().Add(expRefreshToken).Unix(),
 	}
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
@@ -79,7 +79,7 @@ func (as *authService) GenerateTokens(email string) (*models.Auth, error) {
 	return auth, nil
 }
 
-func (as *authService) VerifyRefreshToken(refreshToken string) (string, error) {
+func (as *authService) VerifyRefreshToken(refreshToken string) (int64, error) {
 	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
 		// Verify signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -89,39 +89,39 @@ func (as *authService) VerifyRefreshToken(refreshToken string) (string, error) {
 	})
 
 	if err != nil {
-		return "", common.ErrorUnauthorized.Clone().WrapError(err)
+		return 0, common.ErrorUnauthorized.Clone().WrapError(err)
 	}
 
 	// Extract claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return "", common.ErrorUnauthorized.Clone().WrapMessage("Invalid token")
+		return 0, common.ErrorUnauthorized.Clone().WrapMessage("Invalid token")
 	}
 
 	// Get email from claims
-	email, ok := claims["email"].(string)
+	userID, ok := claims["user_id"].(int64)
 	if !ok {
-		return "", common.ErrorUnauthorized.Clone().WrapMessage("Invalid token claims")
+		return 0, common.ErrorUnauthorized.Clone().WrapMessage("Invalid token claims")
 	}
 
-	return email, nil
+	return userID, nil
 }
 
 func (as *authService) RefreshAccessToken(ctx context.Context, refreshToken string) (*models.Auth, error) {
 	// Verify refresh token
-	email, err := as.VerifyRefreshToken(refreshToken)
+	userID, err := as.VerifyRefreshToken(refreshToken)
 	if err != nil {
 		return nil, err
 	}
 
 	// Verify user still exists
-	_, err = as.es.FindByEmail(ctx, email)
+	_, err = as.es.FindByID(ctx, userID)
 	if err != nil {
 		return nil, common.ErrorUnauthorized.Clone().WrapMessage("User not found")
 	}
 
 	// Generate new tokens
-	auth, err := as.GenerateTokens(email)
+	auth, err := as.GenerateTokens(userID)
 	if err != nil {
 		return nil, common.ErrorCreateFailed.Clone().WrapError(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/vlahanam/company-management/common"
 	"github.com/vlahanam/company-management/internal/initialize"
 	"github.com/vlahanam/company-management/internal/models"
 	"gorm.io/gorm"
@@ -21,19 +22,26 @@ func main() {
 	if err := seedRoles(db); err != nil {
 		log.Fatalf("Failed to seed roles: %v", err)
 	}
-	fmt.Println("✓ Roles seeded successfully")
 
 	// Seed permissions
 	if err := seedPermissions(db); err != nil {
 		log.Fatalf("Failed to seed permissions: %v", err)
 	}
-	fmt.Println("✓ Permissions seeded successfully")
 
 	// Seed role_permissions
 	if err := seedRolePermissions(db); err != nil {
 		log.Fatalf("Failed to seed role permissions: %v", err)
 	}
-	fmt.Println("✓ Role permissions seeded successfully")
+
+	// Seed users
+	if err := seedUser(db); err != nil {
+		log.Fatalf("Failed to seed user: %v", err)
+	}
+
+	// Seed user_roles
+	if err := seedUserRole(db); err != nil {
+		log.Fatalf("Failed to seed user role: %v", err)
+	}
 
 	fmt.Println("Database seeding completed!")
 }
@@ -152,6 +160,67 @@ func seedRolePermissions(db *gorm.DB) error {
 	// Batch insert all role_permissions
 	if err := db.Create(&rolePermissions).Error; err != nil {
 		return fmt.Errorf("failed to create role_permissions: %w", err)
+	}
+
+	return nil
+}
+
+func seedUser(db *gorm.DB) error {
+	pw, _ := common.HashPassword("password123")
+
+	users := []models.User{
+		{
+			FullName: "Super Admin",
+			HashPassword: pw,
+			Email: "super-admin@gmail.com",
+
+		},
+		{
+			FullName: "Admin",
+			HashPassword: pw,
+			Email: "admin@gmail.com",
+
+		},
+		{
+			FullName: "User",
+			HashPassword: pw,
+			Email: "user@gmail.com",
+
+		},
+	}
+
+	if err := db.Create(&users).Error; err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return nil
+}
+
+func seedUserRole(db *gorm.DB) error {
+	now := time.Now()
+
+	users := []models.UserRole{
+		{
+			UserID: 1,
+			RoleID: 1,
+			AssignedAt: &now,
+		},
+		{
+			UserID: 2,
+			RoleID: 2,
+			AssignedAt: &now,
+
+		},
+		{
+			UserID: 3,
+			RoleID: 10,
+			AssignedAt: &now,
+
+		},
+	}
+
+	if err := db.Create(&users).Error; err != nil {
+		return fmt.Errorf("failed to create user role: %w", err)
 	}
 
 	return nil

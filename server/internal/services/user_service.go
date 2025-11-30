@@ -53,3 +53,12 @@ func (es *userService) FindByEmail(ctx context.Context, email string) (*models.U
 
 	return emp, nil
 }
+
+func (es *userService) FindByID(ctx context.Context, id int64) (*models.User, error) {
+	emp, err := es.er.GetFirst(ctx, map[string]interface{}{"id": id})
+	if err != nil {
+		return nil, err
+	}
+
+	return emp, nil
+}
