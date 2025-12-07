@@ -3,10 +3,11 @@ package common
 import (
 	"database/sql/driver"
 	"fmt"
-	"github.com/btcsuite/btcutil/base58"
-	"github.com/pkg/errors"
 	"strconv"
 	"strings"
+
+	"github.com/btcsuite/btcutil/base58"
+	"github.com/pkg/errors"
 )
 
 // UID is method to generate a virtual unique identifier for whole system
@@ -14,6 +15,10 @@ import (
 // 32 bits for Local ID, max (2^32) - 1
 // 10 bits for Object Type
 // 18 bits for Shard ID
+
+const (
+	ObjectTypeUser int64 = iota + 1
+)
 
 type UID struct {
 	localID    uint32
