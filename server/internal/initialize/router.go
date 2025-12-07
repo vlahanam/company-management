@@ -5,6 +5,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/vlahanam/company-management/internal/controllers"
+	"github.com/vlahanam/company-management/internal/models"
 	"github.com/vlahanam/company-management/utils"
 )
 
@@ -24,9 +25,9 @@ func InitRoute(cfg *Config, db *gorm.DB) {
 	v1.Post("/refresh", controllers.RefreshHandler(db, cfg.Auth.AccessSecret, cfg.Auth.RefreshSecret))
 	v1.Post("/register", controllers.RegisterHandler(db))
 
-	v1.Use(utils.AuthMiddleware)
-	
-	v1.Get("/users", controllers.GetListUsers(db))
+	v1.Use(utils.AuthMiddleware(cfg.Auth.AccessSecret))
+
+	v1.Get("/users", utils.CheckRole([]string{models.RoleNames[models.RoleSuperAdmin]}), controllers.GetListUsers(db))
 	v1.Get("/users/:id", controllers.GetUser(db))
 	v1.Put("/users/:id", controllers.UpdateUser(db))
 	v1.Delete("/users/:id", controllers.DeleteUser(db))

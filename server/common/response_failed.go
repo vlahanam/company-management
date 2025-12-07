@@ -63,14 +63,14 @@ func (e *rootError) WrapError(err error) *rootError {
 }
 
 func (e *rootError) WrapErrorSafe(err error) *rootError {
-    e.Err = err
-    
-    if utils.IsDevelopment() {
-        debug := err.Error()
-        e.Debug = &debug
-    }
-    
-    return e
+	e.Err = err
+
+	if utils.IsDevelopment() {
+		debug := err.Error()
+		e.Debug = &debug
+	}
+
+	return e
 }
 
 func (e *rootError) SetDetail(key, value string) *rootError {

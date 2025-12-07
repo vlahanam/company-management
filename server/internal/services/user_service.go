@@ -6,11 +6,13 @@ import (
 	"github.com/vlahanam/company-management/common"
 	"github.com/vlahanam/company-management/internal/models"
 	"github.com/vlahanam/company-management/internal/requests"
+	"github.com/vlahanam/company-management/utils"
 )
 
 type UserRepo interface {
 	CreateUser(ctx context.Context, data *models.User) error
-	GetFirst(ctx context.Context, data map[string]interface{}) (*models.User, error)
+	GetUser(ctx context.Context, data map[string]interface{}) (*models.User, error)
+	GetUserRoleNames(ctx context.Context, userID uint64) ([]string, error)
 }
 
 type userService struct {
@@ -27,7 +29,7 @@ func (es *userService) CreateUser(ctx context.Context, data *requests.RegisterRe
 		return common.ErrorValidation.Clone().SetDetail("email", models.ErrEmailAlreadyExists.Error())
 	}
 
-	hashPassword, err := common.HashPassword(data.Password)
+	hashPassword, err := utils.HashPassword(data.Password)
 	if err != nil {
 		return common.ErrorCreateFailed.Clone().WrapError(err)
 	}
@@ -46,7 +48,7 @@ func (es *userService) CreateUser(ctx context.Context, data *requests.RegisterRe
 }
 
 func (es *userService) FindByEmail(ctx context.Context, email string) (*models.User, error) {
-	emp, err := es.er.GetFirst(ctx, map[string]interface{}{"email": email})
+	emp, err := es.er.GetUser(ctx, map[string]interface{}{"email": email})
 	if err != nil {
 		return nil, err
 	}
@@ -54,11 +56,16 @@ func (es *userService) FindByEmail(ctx context.Context, email string) (*models.U
 	return emp, nil
 }
 
-func (es *userService) FindByID(ctx context.Context, id int64) (*models.User, error) {
-	emp, err := es.er.GetFirst(ctx, map[string]interface{}{"id": id})
+func (es *userService) FindByID(ctx context.Context, id uint64) (*models.User, error) {
+	emp, err := es.er.GetUser(ctx, map[string]interface{}{"id": id})
 	if err != nil {
 		return nil, err
 	}
 
 	return emp, nil
+}
+
+// GetRoleNamesByUserID lấy danh sách role names của user
+func (es *userService) GetRoleNamesByUserID(ctx context.Context, userID uint64) ([]string, error) {
+	return es.er.GetUserRoleNames(ctx, userID)
 }
