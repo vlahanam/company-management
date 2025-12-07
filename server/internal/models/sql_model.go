@@ -7,7 +7,7 @@ import (
 )
 
 type SQLModel struct {
-	ID        int64       `json:"-" gorm:"column:id"`
+	ID        uint64       `json:"-" gorm:"column:id"`
 	FakeId    *common.UID `json:"id" gorm:"-"`
 	CreatedAt *time.Time  `json:"created_at,omitempty" gorm:"column:created_at"`
 	UpdatedAt *time.Time  `json:"updated_at,omitempty" gorm:"column:updated_at"`

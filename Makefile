@@ -15,7 +15,7 @@ COMPOSE_DEV := docker/docker-compose.yml
 COMPOSE_PROD := docker/docker-compose.prod.yml
 
 # Migration settings
-MIGRATION_DIR := server/database/migration
+MIGRATION_DIR := server/database/migrations
 SEED_DIR := server/database/seed
 DB_USER ?= dev_user
 DB_PASSWORD ?= dev_password
@@ -23,6 +23,15 @@ DB_NAME ?= company_db
 DB_HOST ?= localhost
 DB_PORT ?= 33066
 DB_URL := "mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DB_HOST):$(DB_PORT))/$(DB_NAME)?multiStatements=true"
+
+# Docker container names
+DEV_SERVER_CONTAINER := company-management-server-dev
+PROD_SERVER_CONTAINER := company-management-server-prod
+
+# Database URL for Docker internal network
+DOCKER_DB_HOST := company-management-mysql-dev
+DOCKER_DB_PORT := 3306
+DOCKER_DB_URL := "mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DOCKER_DB_HOST):$(DOCKER_DB_PORT))/$(DB_NAME)?multiStatements=true"
 
 ## help: Display this help message
 help:
@@ -202,7 +211,7 @@ restore-db:
 	docker exec -i company-management-mysql-prod mysql -u$$MYSQL_USER -p$$MYSQL_PASSWORD company_db < ./docker/mysql/backup/$$backup
 	@echo "$(GREEN)✓ Restore completed$(NC)"
 
-## migrate-create: Create a new migration file
+## migrate-create: Create a new migration file (inside Docker container)
 migrate-create:
 	@read -p "Enter migration name (e.g., create_users_table): " migration_name; \
 	if [ -z "$$migration_name" ]; then \
@@ -214,45 +223,45 @@ migrate-create:
 		echo "$(YELLOW)Invalid characters detected. Please use only: a-z, A-Z, 0-9, _$(NC)"; \
 		exit 1; \
 	fi; \
-	echo "$(BLUE)Creating migration: $$migration_name$(NC)"; \
-	migrate create -ext sql -dir $(MIGRATION_DIR) -seq $$migration_name; \
+	echo "$(BLUE)Creating migration: $$migration_name (in Docker container)$(NC)"; \
+	docker exec $(DEV_SERVER_CONTAINER) migrate create -ext sql -dir database/migrations -seq $$migration_name; \
 	echo "$(GREEN)✓ Migration files created in $(MIGRATION_DIR)$(NC)"
 
-## migrate-up: Apply all pending migrations
+## migrate-up: Apply all pending migrations (inside Docker container)
 migrate-up:
-	@echo "$(BLUE)Applying migrations...$(NC)"
-	@migrate -path $(MIGRATION_DIR) -database $(DB_URL) -verbose up
+	@echo "$(BLUE)Applying migrations in Docker container...$(NC)"
+	@docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) -verbose up
 	@echo "$(GREEN)✓ Migrations applied$(NC)"
 
-## migrate-down: Rollback the last migration
+## migrate-down: Rollback the last migration (inside Docker container)
 migrate-down:
-	@echo "$(YELLOW)⚠ Rolling back last migration...$(NC)"
-	@migrate -path $(MIGRATION_DIR) -database $(DB_URL) -verbose down 1
+	@echo "$(YELLOW)⚠ Rolling back last migration in Docker container...$(NC)"
+	@docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) -verbose down 1
 	@echo "$(GREEN)✓ Migration rolled back$(NC)"
 
-## migrate-force: Force set migration version
+## migrate-force: Force set migration version (inside Docker container)
 migrate-force:
 	@read -p "Enter version number to force: " version; \
 	if [ -z "$$version" ]; then \
 		echo "$(RED)Error: Version number cannot be empty$(NC)"; \
 		exit 1; \
 	fi; \
-	echo "$(YELLOW)⚠ Force setting migration version to $$version$(NC)"; \
-	migrate -path $(MIGRATION_DIR) -database $(DB_URL) force $$version; \
+	echo "$(YELLOW)⚠ Force setting migration version to $$version in Docker container$(NC)"; \
+	docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) force $$version; \
 	echo "$(GREEN)✓ Migration version set to $$version$(NC)"
 
-## migrate-version: Show current migration version
+## migrate-version: Show current migration version (inside Docker container)
 migrate-version:
-	@echo "$(BLUE)Current migration version:$(NC)"
-	@migrate -path $(MIGRATION_DIR) -database $(DB_URL) version
+	@echo "$(BLUE)Current migration version (from Docker container):$(NC)"
+	@docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) version
 
-## migrate-drop: Drop all tables (DANGEROUS!)
+## migrate-drop: Drop all tables (DANGEROUS!) (inside Docker container)
 migrate-drop:
 	@echo "$(RED)⚠⚠⚠ WARNING: This will drop all tables! ⚠⚠⚠$(NC)"
 	@read -p "Are you ABSOLUTELY sure? Type 'yes' to confirm: " confirm; \
 	if [ "$$confirm" = "yes" ]; then \
-		echo "$(BLUE)Dropping all tables...$(NC)"; \
-		migrate -path $(MIGRATION_DIR) -database $(DB_URL) drop -f; \
+		echo "$(BLUE)Dropping all tables in Docker container...$(NC)"; \
+		docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) drop -f; \
 		echo "$(GREEN)✓ All tables dropped$(NC)"; \
 	else \
 		echo "$(YELLOW)Cancelled$(NC)"; \

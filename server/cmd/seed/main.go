@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/vlahanam/company-management/common"
 	"github.com/vlahanam/company-management/internal/initialize"
 	"github.com/vlahanam/company-management/internal/models"
+	"github.com/vlahanam/company-management/utils"
 	"gorm.io/gorm"
 )
 
@@ -166,7 +166,7 @@ func seedRolePermissions(db *gorm.DB) error {
 }
 
 func seedUser(db *gorm.DB) error {
-	pw, _ := common.HashPassword("password123")
+	pw, _ := utils.HashPassword("password123")
 
 	users := []models.User{
 		{
