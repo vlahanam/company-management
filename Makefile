@@ -1,4 +1,4 @@
-.PHONY: help dev prod build-dev build-prod up-dev up-prod down-dev down-prod logs-dev logs-prod clean restart-dev restart-prod db-dev db-prod
+.PHONY: help dev prod build-dev build-prod up-dev up-prod down-dev down-prod logs-dev logs-prod clean restart-dev restart-prod db-dev db-prod migrate-create migrate-up migrate-down migrate-force migrate-version migrate-drop seed seed-local server-dev server-prod client-dev client-prod nginx-dev nginx-prod status ps backup-db restore-db
 
 # Default target
 .DEFAULT_GOAL := help
@@ -13,6 +13,27 @@ NC := \033[0m # No Color
 # Docker compose files
 COMPOSE_DEV := docker/docker-compose.yml
 COMPOSE_PROD := docker/docker-compose.prod.yml
+
+# Migration settings
+MIGRATION_DIR := server/database/migrations
+SEED_DIR := server/database/seed
+DB_USER ?= dev_user
+DB_PASSWORD ?= dev_password
+DB_NAME ?= company_db
+DB_HOST ?= localhost
+DB_PORT ?= 33066
+DB_URL := "mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DB_HOST):$(DB_PORT))/$(DB_NAME)?multiStatements=true"
+
+# Docker container names
+DEV_SERVER_CONTAINER := company-management-server-dev
+PROD_SERVER_CONTAINER := company-management-server-prod
+DEV_CLIENT_CONTAINER := company-management-client-dev
+PROD_CLIENT_CONTAINER := company-management-client-prod
+
+# Database URL for Docker internal network
+DOCKER_DB_HOST := company-management-mysql-dev
+DOCKER_DB_PORT := 3306
+DOCKER_DB_URL := "mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DOCKER_DB_HOST):$(DOCKER_DB_PORT))/$(DB_NAME)?multiStatements=true"
 
 ## help: Display this help message
 help:
@@ -38,6 +59,30 @@ help:
 	@echo "  $(GREEN)make logs-prod$(NC)    - Show production logs"
 	@echo "  $(GREEN)make db-prod$(NC)      - Connect to production MySQL"
 	@echo ""
+	@echo "$(BLUE)Shell Access:$(NC)"
+	@echo "  $(GREEN)make server-dev$(NC)   - Access development server shell"
+	@echo "  $(GREEN)make server-prod$(NC)  - Access production server shell"
+	@echo "  $(GREEN)make client-dev$(NC)   - Access development client shell"
+	@echo "  $(GREEN)make client-prod$(NC)  - Access production client shell"
+	@echo "  $(GREEN)make nginx-dev$(NC)    - Access development nginx shell"
+	@echo "  $(GREEN)make nginx-prod$(NC)   - Access production nginx shell"
+	@echo ""
+	@echo "$(BLUE)Database Migration:$(NC)"
+	@echo "  $(GREEN)make migrate-create$(NC)              - Create new migration file"
+	@echo "  $(GREEN)make migrate-up$(NC)                  - Apply all migrations"
+	@echo "  $(GREEN)make migrate-down$(NC)                - Rollback last migration"
+	@echo "  $(GREEN)make migrate-force$(NC)               - Force set migration version"
+	@echo "  $(GREEN)make migrate-version$(NC)             - Show current migration version"
+	@echo "  $(GREEN)make migrate-drop$(NC)                - Drop all tables (dangerous!)"
+	@echo ""
+	@echo "$(BLUE)Database Seeding:$(NC)"
+	@echo "  $(GREEN)make seed$(NC)                        - Run database seeder in Docker container"
+	@echo "  $(GREEN)make seed-local$(NC)                  - Run database seeder from local machine"
+	@echo ""
+	@echo "$(BLUE)Database Backup & Restore:$(NC)"
+	@echo "  $(GREEN)make backup-db$(NC)                   - Backup MySQL database"
+	@echo "  $(GREEN)make restore-db$(NC)                  - Restore MySQL database from backup"
+	@echo ""
 	@echo "$(BLUE)Utility Commands:$(NC)"
 	@echo "  $(GREEN)make clean$(NC)        - Remove all containers, volumes, and images"
 	@echo "  $(GREEN)make status$(NC)       - Show status of all containers"
@@ -47,13 +92,15 @@ help:
 ## dev: Start development environment
 dev: build-dev up-dev
 	@echo "$(GREEN)✓ Development environment started!$(NC)"
-	@echo "$(YELLOW)Server:$(NC) http://localhost:8080"
-	@echo "$(YELLOW)Nginx:$(NC) http://localhost"
+	@echo "$(YELLOW)Client:$(NC) http://localhost:3030"
+	@echo "$(YELLOW)Server:$(NC) http://localhost:8808"
+	@echo "$(YELLOW)Nginx:$(NC) http://localhost:880"
 	@echo "$(YELLOW)MySQL:$(NC) localhost:3306"
 
 ## prod: Start production environment
 prod: build-prod up-prod
 	@echo "$(GREEN)✓ Production environment started!$(NC)"
+	@echo "$(YELLOW)Client:$(NC) http://localhost:3000"
 	@echo "$(YELLOW)Server:$(NC) http://localhost:8080"
 	@echo "$(YELLOW)Nginx:$(NC) https://localhost"
 	@echo "$(YELLOW)MySQL:$(NC) localhost:3306"
@@ -154,6 +201,16 @@ server-prod:
 	@echo "$(BLUE)Accessing production server shell...$(NC)"
 	docker exec -it company-management-server-prod sh
 
+## client-dev: Access development client shell
+client-dev:
+	@echo "$(BLUE)Accessing development client shell...$(NC)"
+	docker exec -it $(DEV_CLIENT_CONTAINER) sh
+
+## client-prod: Access production client shell
+client-prod:
+	@echo "$(BLUE)Accessing production client shell...$(NC)"
+	docker exec -it $(PROD_CLIENT_CONTAINER) sh
+
 ## nginx-dev: Access development nginx shell
 nginx-dev:
 	@echo "$(BLUE)Accessing development nginx shell...$(NC)"
@@ -179,4 +236,78 @@ restore-db:
 	@read -p "Enter backup filename: " backup; \
 	docker exec -i company-management-mysql-prod mysql -u$$MYSQL_USER -p$$MYSQL_PASSWORD company_db < ./docker/mysql/backup/$$backup
 	@echo "$(GREEN)✓ Restore completed$(NC)"
+
+## migrate-create: Create a new migration file (inside Docker container)
+migrate-create:
+	@read -p "Enter migration name (e.g., create_users_table): " migration_name; \
+	if [ -z "$$migration_name" ]; then \
+		echo "$(RED)Error: Migration name cannot be empty$(NC)"; \
+		exit 1; \
+	fi; \
+	if echo "$$migration_name" | LC_ALL=C grep -q '[^a-zA-Z0-9_]'; then \
+		echo "$(RED)Error: Migration name must contain only letters, numbers, and underscores$(NC)"; \
+		echo "$(YELLOW)Invalid characters detected. Please use only: a-z, A-Z, 0-9, _$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(BLUE)Creating migration: $$migration_name (in Docker container)$(NC)"; \
+	docker exec $(DEV_SERVER_CONTAINER) migrate create -ext sql -dir database/migrations -seq $$migration_name; \
+	echo "$(GREEN)✓ Migration files created in $(MIGRATION_DIR)$(NC)"
+
+## migrate-up: Apply all pending migrations (inside Docker container)
+migrate-up:
+	@echo "$(BLUE)Applying migrations in Docker container...$(NC)"
+	@docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) -verbose up
+	@echo "$(GREEN)✓ Migrations applied$(NC)"
+
+## migrate-down: Rollback the last migration (inside Docker container)
+migrate-down:
+	@echo "$(YELLOW)⚠ Rolling back last migration in Docker container...$(NC)"
+	@docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) -verbose down 1
+	@echo "$(GREEN)✓ Migration rolled back$(NC)"
+
+## migrate-force: Force set migration version (inside Docker container)
+migrate-force:
+	@read -p "Enter version number to force: " version; \
+	if [ -z "$$version" ]; then \
+		echo "$(RED)Error: Version number cannot be empty$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(YELLOW)⚠ Force setting migration version to $$version in Docker container$(NC)"; \
+	docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) force $$version; \
+	echo "$(GREEN)✓ Migration version set to $$version$(NC)"
+
+## migrate-version: Show current migration version (inside Docker container)
+migrate-version:
+	@echo "$(BLUE)Current migration version (from Docker container):$(NC)"
+	@docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) version
+
+## migrate-drop: Drop all tables (DANGEROUS!) (inside Docker container)
+migrate-drop:
+	@echo "$(RED)⚠⚠⚠ WARNING: This will drop all tables! ⚠⚠⚠$(NC)"
+	@read -p "Are you ABSOLUTELY sure? Type 'yes' to confirm: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+		echo "$(BLUE)Dropping all tables in Docker container...$(NC)"; \
+		docker exec $(DEV_SERVER_CONTAINER) migrate -path database/migrations -database $(DOCKER_DB_URL) drop -f; \
+		echo "$(GREEN)✓ All tables dropped$(NC)"; \
+	else \
+		echo "$(YELLOW)Cancelled$(NC)"; \
+	fi
+
+## seed: Run database seeder (inside Docker container)
+seed:
+	@echo "$(BLUE)Running database seeder...$(NC)"
+	@docker exec company-management-server-dev sh -c "cd /app && go run cmd/seed/main.go"
+	@echo "$(GREEN)✓ Database seeding completed$(NC)"
+
+## seed-local: Run database seeder from local machine
+seed-local:
+	@echo "$(BLUE)Running database seeder locally...$(NC)"
+	@cd server && \
+		DB_HOST=localhost \
+		DB_PORT=33066 \
+		DB_USER=$(DB_USER) \
+		DB_PASSWORD=$(DB_PASSWORD) \
+		DB_NAME=$(DB_NAME) \
+		go run cmd/seed/main.go
+	@echo "$(GREEN)✓ Database seeding completed$(NC)"
 

@@ -1,0 +1,441 @@
+@host_http = http://localhost:880
+@host_docker = http://localhost:8808
+
+### Health Check (via Nginx HTTP)
+GET {{host_http}}/health
+
+---------------------------------------
+
+### Health Check (Direct to Server - Docker)
+GET {{host_docker}}/health
+
+###############################################
+# Authentication
+###############################################
+
+### Login
+# @name login
+POST {{host_docker}}/api/v1/login
+Content-Type: application/json
+
+{
+  "email": "super-admin@gmail.com",
+  "password": "password123"
+}
+
+### Refresh token
+POST {{host_docker}}/api/v1/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{login.response.body.data.refresh_token}}"
+}
+
+### Register
+POST {{host_docker}}/api/v1/register
+Content-Type: application/json
+
+{
+  "full_name": "Nguyen Van A",
+  "email": "nguyenvana@gmail.com",
+  "password": "password123"
+}
+
+###############################################
+# Users (Requires Authentication)
+###############################################
+
+### List users (Super Admin only) - with filters
+GET {{host_docker}}/api/v1/users?page=1&keyword=nguyen&company_id=1&position_id=2
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get user by ID
+GET {{host_docker}}/api/v1/users/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Update user - Full example with all fields
+PUT {{host_docker}}/api/v1/users/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "full_name": "Nguyen Van B",
+  "email": "nguyenvanb@gmail.com",
+  "date_of_birth": "1990-05-15",
+  "gender": "Male",
+  "id_card_number": "001234567890",
+  "phone_number": "+84987654321",
+  "avatar": "https://example.com/avatar.jpg"
+}
+
+### Delete user
+DELETE {{host_docker}}/api/v1/users/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+###############################################
+# Companies (Requires Authentication)
+###############################################
+
+### Create company - Full example with all fields
+POST {{host_docker}}/api/v1/companies
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Tech Innovations Ltd",
+  "parent_id": null,
+  "description": "A leading technology company specializing in software development",
+  "founded_date": "2020-01-15",
+  "address": "123 Nguyen Hue Street, District 1, Ho Chi Minh City",
+  "phone_number": "+84283456789",
+  "email": "info@techinnovations.vn"
+}
+
+### Create subsidiary company
+POST {{host_docker}}/api/v1/companies
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Tech Innovations Hanoi Branch",
+  "parent_id": 1,
+  "description": "Northern branch of Tech Innovations Ltd",
+  "founded_date": "2022-06-01",
+  "address": "456 Ba Trieu Street, Hoan Kiem, Hanoi",
+  "phone_number": "+84243456789",
+  "email": "hanoi@techinnovations.vn"
+}
+
+### List companies
+GET {{host_docker}}/api/v1/companies?page=1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get company by ID
+GET {{host_docker}}/api/v1/companies/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Update company
+PUT {{host_docker}}/api/v1/companies/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Tech Innovations Corporation",
+  "description": "Updated: Leading technology corporation in Vietnam",
+  "address": "789 Le Loi Street, District 1, Ho Chi Minh City",
+  "phone_number": "+84281234567",
+  "email": "contact@techinnovations.vn"
+}
+
+### Delete company
+DELETE {{host_docker}}/api/v1/companies/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+###############################################
+# Positions (Requires Authentication)
+###############################################
+
+### Create position - Full example with all fields
+POST {{host_docker}}/api/v1/positions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Senior Software Engineer",
+  "description": "Full-stack developer with 5+ years experience, responsible for designing and implementing complex systems",
+  "level": 3
+}
+
+### Create position - Entry level
+POST {{host_docker}}/api/v1/positions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Junior Developer",
+  "description": "Entry-level developer position",
+  "level": 1
+}
+
+### List positions by company
+GET {{host_docker}}/api/v1/positions/1?page=1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get position by ID
+GET {{host_docker}}/api/v1/positions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Update position
+PUT {{host_docker}}/api/v1/positions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Lead Software Engineer",
+  "description": "Team lead responsible for technical direction and mentoring",
+  "level": 4
+}
+
+### Delete position
+DELETE {{host_docker}}/api/v1/positions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+###############################################
+# Contracts (Requires Authentication)
+###############################################
+
+### Create contract - Probation type
+POST {{host_docker}}/api/v1/contracts
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "user_id": 2,
+  "company_id": 1,
+  "position_id": 1,
+  "contract_number": "CT-2026-001",
+  "contract_type": "Probation",
+  "start_date": "2026-01-15",
+  "end_date": "2026-03-15",
+  "salary": 15000000.00,
+  "status": "Active",
+  "notes": "2-month probation period for new employee"
+}
+
+### Create contract - Fixed-term type
+POST {{host_docker}}/api/v1/contracts
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "user_id": 3,
+  "company_id": 1,
+  "position_id": 2,
+  "contract_number": "CT-2026-002",
+  "contract_type": "Fixed-term",
+  "start_date": "2026-02-01",
+  "end_date": "2027-01-31",
+  "salary": 25000000.00,
+  "status": "Pending",
+  "file_path": "/contracts/2026/CT-2026-002.pdf",
+  "notes": "1-year fixed-term contract, renewable"
+}
+
+### Create contract - Permanent type
+POST {{host_docker}}/api/v1/contracts
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "user_id": 4,
+  "company_id": 1,
+  "position_id": 3,
+  "contract_number": "CT-2026-003",
+  "contract_type": "Permanent",
+  "start_date": "2026-01-01",
+  "salary": 40000000.00,
+  "status": "Active",
+  "file_path": "/contracts/2026/CT-2026-003.pdf",
+  "notes": "Permanent contract for senior position"
+}
+
+### Create contract - Freelance type
+POST {{host_docker}}/api/v1/contracts
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "user_id": 5,
+  "company_id": 1,
+  "position_id": null,
+  "contract_number": "CT-2026-004",
+  "contract_type": "Freelance",
+  "start_date": "2026-01-01",
+  "end_date": "2026-06-30",
+  "salary": 30000000.00,
+  "status": "Active",
+  "notes": "Freelance contract for specific project"
+}
+
+### Create contract - Internship type
+POST {{host_docker}}/api/v1/contracts
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "user_id": 6,
+  "company_id": 1,
+  "position_id": 5,
+  "contract_number": "CT-2026-005",
+  "contract_type": "Internship",
+  "start_date": "2026-03-01",
+  "end_date": "2026-08-31",
+  "salary": 5000000.00,
+  "status": "Pending",
+  "notes": "6-month internship program for university students"
+}
+
+### List contracts
+GET {{host_docker}}/api/v1/contracts?page=1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get contract by ID
+GET {{host_docker}}/api/v1/contracts/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Update contract - Change status to Active
+PUT {{host_docker}}/api/v1/contracts/2
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "contract_type": "Fixed-term",
+  "start_date": "2026-02-01",
+  "end_date": "2027-01-31",
+  "salary": 27000000.00,
+  "status": "Active",
+  "notes": "Updated salary and activated contract"
+}
+
+### Update contract - Terminate
+PUT {{host_docker}}/api/v1/contracts/3
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "status": "Terminated",
+  "end_date": "2026-06-30",
+  "notes": "Contract terminated early by mutual agreement"
+}
+
+### Delete contract
+DELETE {{host_docker}}/api/v1/contracts/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+###############################################
+# Roles (Requires Authentication)
+###############################################
+
+### Create role - HR Manager
+POST {{host_docker}}/api/v1/roles
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "HR Manager",
+  "description": "Human Resources Manager with full access to employee management"
+}
+
+### Create role - Sales Staff
+POST {{host_docker}}/api/v1/roles
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Sales Staff",
+  "description": "Sales team member with customer and order management permissions"
+}
+
+### Create role - Accountant
+POST {{host_docker}}/api/v1/roles
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Accountant",
+  "description": "Financial department staff with access to financial records and reporting"
+}
+
+### List roles
+GET {{host_docker}}/api/v1/roles?page=1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get role by ID - Super Admin
+GET {{host_docker}}/api/v1/roles/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get role by ID - Admin
+GET {{host_docker}}/api/v1/roles/2
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get role by ID - Employee
+GET {{host_docker}}/api/v1/roles/10
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Update role
+PUT {{host_docker}}/api/v1/roles/3
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Senior HR Manager",
+  "description": "Senior Human Resources Manager with extended permissions including recruitment and policy management"
+}
+
+### Delete role
+DELETE {{host_docker}}/api/v1/roles/11
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+###############################################
+# Permissions (Requires Authentication)
+###############################################
+
+### Create permission - Custom permission
+POST {{host_docker}}/api/v1/permissions
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "View Dashboard Analytics",
+  "description": "Permission to view advanced analytics and business intelligence dashboards"
+}
+
+### Create permission - Export Reports
+POST {{host_docker}}/api/v1/permissions
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Export Reports",
+  "description": "Permission to export reports in various formats (PDF, Excel, CSV)"
+}
+
+### Create permission - Manage Settings
+POST {{host_docker}}/api/v1/permissions
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Manage System Settings",
+  "description": "Permission to configure system-wide settings and preferences"
+}
+
+### List permissions
+GET {{host_docker}}/api/v1/permissions?page=1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get permission by ID - Create User
+GET {{host_docker}}/api/v1/permissions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get permission by ID - Manage Finances
+GET {{host_docker}}/api/v1/permissions/11
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Get permission by ID - Create Contract
+GET {{host_docker}}/api/v1/permissions/22
+Authorization: Bearer {{login.response.body.data.access_token}}
+
+### Update permission
+PUT {{host_docker}}/api/v1/permissions/1
+Authorization: Bearer {{login.response.body.data.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Create and Invite User",
+  "description": "Permission to create new user accounts and send invitation emails"
+}
+
+### Delete permission
+DELETE {{host_docker}}/api/v1/permissions/50
+Authorization: Bearer {{login.response.body.data.access_token}}

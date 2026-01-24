@@ -1,31 +1,45 @@
 # syntax=docker/dockerfile:1
 
 # Build arguments
-ARG GO_VERSION=1.21
+ARG GO_VERSION=1.25.3
 ARG BUILD_ENV=production
 
 # Base stage - common for all environments
 FROM golang:${GO_VERSION}-alpine AS base
 WORKDIR /app
 
-# Install basic dependencies
+# Install build dependencies and tools
+# gcc, g++, make, musl-dev: Required for CGO and building Go packages with C dependencies
+# git: Required for go mod download from git repositories
+# ca-certificates: For HTTPS connections
+# tzdata: For timezone support
 RUN apk add --no-cache \
+    gcc \
+    g++ \
+    make \
+    musl-dev \
     git \
     ca-certificates \
-    tzdata
+    tzdata \
+    curl \
+    bash
 
 # Copy dependency files
-COPY go.mod go.sum* ./
+COPY go.mod ./
+COPY go.sum ./
 
-# Download dependencies
-RUN go mod download
+# Download dependencies and verify
+RUN go mod download && \
+    go mod verify
 
 # Development stage
 FROM base AS development
 ARG AIR_VERSION=latest
+ARG MIGRATE_VERSION=v4.18.1
 
-# Install Air for hot-reload
-RUN go install github.com/air-verse/air@${AIR_VERSION}
+# Install Air for hot-reload and golang-migrate for database migrations
+RUN go install github.com/air-verse/air@${AIR_VERSION} && \
+    go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@${MIGRATE_VERSION}
 
 # Environment variables for development
 ENV GO_ENV=development \
@@ -39,9 +53,6 @@ COPY . .
 # Expose port
 EXPOSE 8080
 
-# Use Air for hot-reload in development
-CMD ["air", "-c", ".air.toml"]
-
 # Builder stage for production
 FROM base AS builder
 
@@ -53,8 +64,8 @@ ENV CGO_ENABLED=0 \
 # Copy source code
 COPY . .
 
-# Build the application
-RUN go build -ldflags="-w -s" -o /app/bin/server ./cmd/server
+# Build the application with proper path
+RUN go build -ldflags="-w -s" -o /app/bin/server ./cmd/main.go
 
 # Production stage
 FROM alpine:latest AS production

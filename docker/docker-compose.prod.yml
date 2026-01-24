@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # MySQL Database for Production
@@ -20,14 +20,24 @@ services:
       - ./mysql/backup:/backup
     networks:
       - company-network
-    command: 
+    command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --max_connections=1000
       - --innodb_buffer_pool_size=1G
       - --innodb_log_file_size=256M
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -71,11 +81,53 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: "2"
           memory: 2G
         reservations:
-          cpus: '1'
+          cpus: "1"
           memory: 1G
+
+  # Next.js Client for Production
+  client:
+    build:
+      context: ../client
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NODE_VERSION: 20
+    container_name: company-management-client-prod
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=/api/v1
+    ports:
+      - "3000:3000"
+    networks:
+      - company-network
+    depends_on:
+      - server
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
 
   # Nginx Reverse Proxy for Production
   nginx:
@@ -95,6 +147,7 @@ services:
       - company-network
     depends_on:
       - server
+      - client
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
@@ -103,7 +156,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: "1"
           memory: 512M
 
 networks:
@@ -117,4 +170,3 @@ volumes:
     driver: local
   nginx_cache_prod:
     driver: local
-
